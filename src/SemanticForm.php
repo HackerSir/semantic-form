@@ -1,266 +1,390 @@
 <?php
 namespace Laravolt\SemanticForm;
 
-use AdamWathan\Form\FormBuilder;
-use Illuminate\Translation\Translator;
-use Laravolt\SemanticForm\Elements\CheckboxField;
+use Carbon\Carbon;
 use Laravolt\SemanticForm\Elements\CheckboxGroup;
-use Laravolt\SemanticForm\Elements\GroupWrapper;
-use Laravolt\SemanticForm\Elements\InputGroup;
-use Laravolt\SemanticForm\Elements\FormGroup;
+use Laravolt\SemanticForm\Elements\Field;
+use Laravolt\SemanticForm\Elements\SelectDateWrapper;
+use Laravolt\SemanticForm\Elements\SelectDateTimeWrapper;
+use Laravolt\SemanticForm\Elements\Text;
+use Laravolt\SemanticForm\Elements\Password;
+use Laravolt\SemanticForm\Elements\Checkbox;
+use Laravolt\SemanticForm\Elements\RadioButton;
+use Laravolt\SemanticForm\Elements\Button;
+use Laravolt\SemanticForm\Elements\Select;
+use Laravolt\SemanticForm\Elements\TextArea;
+use Laravolt\SemanticForm\Elements\Label;
+use Laravolt\SemanticForm\Elements\FormOpen;
+use Laravolt\SemanticForm\Elements\Hidden;
+use Laravolt\SemanticForm\Elements\File;
+use Laravolt\SemanticForm\Elements\Date;
+use Laravolt\SemanticForm\Elements\Email;
+use Laravolt\SemanticForm\OldInput\OldInputInterface;
+use Laravolt\SemanticForm\ErrorStore\ErrorStoreInterface;
 
 class SemanticForm
 {
+    private $oldInput;
+    private $errorStore;
+    private $csrfToken;
+    private $model;
 
-    protected $builder;
-
-    protected $translator;
-
-    /**
-     * SemanticForm constructor.
-     * @param FormBuilder $builder
-     * @param Translator $translator
-     */
-    public function __construct(FormBuilder $builder, Translator $translator)
+    public function setOldInputProvider(OldInputInterface $oldInputProvider)
     {
-        $this->builder = $builder;
-        $this->translator = $translator;
+        $this->oldInput = $oldInputProvider;
+    }
+
+    public function setErrorStore(ErrorStoreInterface $errorStore)
+    {
+        $this->errorStore = $errorStore;
+    }
+
+    public function setToken($token)
+    {
+        $this->csrfToken = $token;
     }
 
     public function open()
     {
-        return $this->builder->open()->addClass('ui form');
+        $open = new FormOpen;
+
+        if ($this->hasToken()) {
+            $open->token($this->csrfToken);
+        }
+
+        return $open;
+    }
+
+    protected function hasToken()
+    {
+        return isset($this->csrfToken);
     }
 
     public function close()
     {
-        return $this->builder->close();
+        $this->unbindModel();
+
+        return '</form>';
     }
 
-    public function text($name, $label = null, $value = null)
+    public function text($name)
     {
-        $control = $this->builder->text($name)->defaultValue($value);
+        $text = new Text($name);
 
-        return $this->formGroup($label, $name, $control);
-    }
-
-    public function password($name, $label = null)
-    {
-        $control = $this->builder->password($name);
-
-        return $this->formGroup($label, $name, $control);
-    }
-
-    public function button($value, $name = null, $class = "")
-    {
-        $button = $this->builder->button($value, $name)->addClass('ui button');
-
-        if ($class) {
-            $button->addClass($class);
+        if (!is_null($value = $this->getValueFor($name))) {
+            $text->value($value);
         }
 
-        return $button;
+        return $text;
     }
 
-    public function submit($value = "Submit", $name = null, $class = "")
+    public function date($name)
     {
-        $button = $this->builder->submit($value)->attribute('name', $name)->addClass('ui button');
+        $date = new Date($name);
 
-        if ($class) {
-            $button->addClass($class);
+        if (!is_null($value = $this->getValueFor($name))) {
+            $date->value($value);
         }
 
-        return $button;
+        return $date;
     }
 
-    public function select($name, $options = array(), $label = null)
+    public function email($name)
     {
-        $control = $this->builder->select($name, $options)->addClass('ui dropdown search');
+        $email = new Email($name);
 
-        return $this->formGroup($label, $name, $control);
+        if (!is_null($value = $this->getValueFor($name))) {
+            $email->value($value);
+        }
+
+        return $email;
     }
 
-    public function checkbox($name, $value, $label = null)
+    public function hidden($name, $value = null)
     {
-        $control = $this->builder->checkbox($name, $value);
+        $hidden = new Hidden($name);
+        $hidden->value($value);
 
-        $label = $this->getLabelTitle($label, $value);
+        if (!is_null($value = $this->getValueFor($name))) {
+            $hidden->value($value);
+        }
 
-        return $this->checkboxField($label, $name, $control);
+        return $hidden;
     }
 
-    public function checkboxGroup($name, $options, $checked = null, $label = null)
+    public function textarea($name)
     {
-        $checked = collect($checked);
+        $textarea = new TextArea($name);
 
-        $checkboxGroup = [];
-        foreach ($options as $value => $text) {
+        if (!is_null($value = $this->getValueFor($name))) {
+            $textarea->value($value);
+        }
 
-            $checkbox = $this->checkbox($name . "[$value]", $value, $text);
+        return $textarea;
+    }
 
-            if ($checked->search($value) !== false) {
-                $checkbox->check();
+    public function password($name)
+    {
+        return new Password($name);
+    }
+
+    public function checkbox($name, $value = 1)
+    {
+        $checkbox = new Checkbox($name, $value);
+
+        $oldValue = $this->getValueFor($name);
+
+        if ($value == $oldValue) {
+            $checkbox->check();
+        }
+
+        return $checkbox;
+    }
+
+    public function checkboxGroup($name, $options)
+    {
+        $controls = [];
+        $oldValue = $this->getValueFor($name);
+
+        foreach($options as $value => $label) {
+            $radio = (new Checkbox($name . "[$value]", $value))->label($label);
+            if ($value == $oldValue) {
+                $radio->check();
             }
 
-            $checkboxGroup[] = $checkbox;
+            $controls[] = $radio;
         }
 
-        $groupLabel = $this->builder->label($this->getLabelTitle($label, $name));
-
-        return new CheckboxGroup($groupLabel, $checkboxGroup);
+        return new CheckboxGroup($controls);
     }
 
-    public function inlineCheckbox($name, $label = null)
+    public function radio($name, $value = null)
     {
-        return $this->checkbox($name, $label)->inline();
-    }
+        $value = is_null($value) ? $name : $value;
 
-    protected function checkGroup($name, $label, $control)
-    {
-        $checkGroup = $this->buildCheckGroup($name, $label, $control);
+        $radio = new RadioButton($name, $value);
 
-        return $this->wrap($checkGroup->addClass('field'));
-    }
+        $oldValue = $this->getValueFor($name);
 
-    protected function checkboxField($label, $name, $control)
-    {
-        $title = $this->getLabelTitle($label, $name);
-        $label = $this->builder->label($title, $name);
-
-        $formGroup = new CheckboxField($label, $control);
-
-        if ($this->builder->hasError($name)) {
-            $formGroup->addClass('error');
+        if ($value == $oldValue) {
+            $radio->check();
         }
 
-        return $formGroup;
+        return $radio;
     }
 
-    protected function buildCheckGroup($name, $label, $control)
+    public function radioGroup($name, $options)
     {
-        $title = $this->getLabelTitle($label, $name);
-        $label = $this->builder->label($title, $name);
+        $controls = [];
+        $oldValue = $this->getValueFor($name);
 
-        $checkGroup = new CheckGroup($label);
+        foreach($options as $value => $label) {
+            $radio = (new RadioButton($name, $value))->label($label);
+            if ($value == $oldValue) {
+                $radio->check();
+            }
 
-        if ($this->builder->hasError($name)) {
-            $checkGroup->helpBlock($this->builder->getError($name));
-            $checkGroup->addClass('has-error');
+            $controls[] = $radio;
         }
 
-        return $checkGroup;
+        return new CheckboxGroup($controls);
     }
 
-    public function radio($name, $label = null, $value = null)
+    public function button($value, $name = null)
     {
-        if (is_null($value)) {
-            $value = $label;
+        return new Button($value, $name);
+    }
+
+    public function submit($value = 'Submit')
+    {
+        $submit = new Button($value);
+        $submit->attribute('type', 'submit');
+
+        return $submit;
+    }
+
+    public function select($name, $options = array(), $defaultValue = null)
+    {
+        $select = new Select($name, $options);
+
+        $selected = $this->getValueFor($name);
+        $select->select($selected);
+
+        $select->defaultValue($defaultValue);
+
+        return $select;
+    }
+
+    public function label($label)
+    {
+        return new Label($label);
+    }
+
+    public function file($name)
+    {
+        return new File($name);
+    }
+
+    public function token()
+    {
+        $token = $this->hidden('_token');
+
+        if (isset($this->csrfToken)) {
+            $token->value($this->csrfToken);
         }
 
-        $control = $this->builder->radio($name, $value);
-        $label = $this->getLabelTitle($label, $name);
-
-        return $this->radioGroup($name, $label, $control);
+        return $token;
     }
 
-    public function inlineRadio($label, $name, $value = null)
+    public function hasError($name)
     {
-        return $this->radio($label, $name, $value)->inline();
-    }
-
-    protected function radioGroup($label, $name, $control)
-    {
-        $checkGroup = $this->buildCheckGroup($label, $name, $control);
-
-        return $this->wrap($checkGroup->addClass('radio'));
-    }
-
-    public function textarea($name, $label = null)
-    {
-        $control = $this->builder->textarea($name);
-        $label = $this->getLabelTitle($label, $name);
-
-        return $this->formGroup($label, $name, $control);
-    }
-
-    public function date($name, $label = null, $value = null)
-    {
-        $control = $this->builder->date($name)->value($value);
-        $label = $this->getLabelTitle($label, $name);
-
-        return $this->formGroup($label, $name, $control);
-    }
-
-    public function email($name, $label = null, $value = null)
-    {
-        $control = $this->builder->email($name)->value($value);
-        $label = $this->getLabelTitle($label, $name);
-
-        return $this->formGroup($label, $name, $control);
-    }
-
-    //public function file($label, $name, $value = null)
-    //{
-    //    $control = $this->builder->file($name)->value($value);
-    //    $label = $this->builder->label($label, $name)->addClass('control-label')->forId($name);
-    //    $control->id($name);
-    //
-    //    $formGroup = new FormGroup($label, $control);
-    //
-    //    if ($this->builder->hasError($name)) {
-    //        $formGroup->helpBlock($this->builder->getError($name));
-    //        $formGroup->addClass('has-error');
-    //    }
-    //
-    //    return $this->wrap($formGroup);
-    //}
-
-    public function inputGroup($name, $label = null, $value = null)
-    {
-        $control = new InputGroup($name);
-        if (!is_null($value) || !is_null($value = $this->getValueFor($name))) {
-            $control->value($value);
+        if (!isset($this->errorStore)) {
+            return false;
         }
 
-        return $this->formGroup($label, $name, $control);
+        return $this->errorStore->hasError($name);
     }
 
-    public function __call($method, $parameters)
+    public function getError($name, $format = null)
     {
-        return call_user_func_array(array($this->builder, $method), $parameters);
-    }
-
-    protected function formGroup($label, $name, $control)
-    {
-        $title = $this->getLabelTitle($label, $name);
-        $label = $this->builder->label($title, $name)->forId($name);
-        $control->id($name);
-
-        $formGroup = new FormGroup($label, $control);
-
-        if ($this->builder->hasError($name)) {
-            //$formGroup->helpBlock($this->builder->getError($name));
-            $formGroup->addClass('error');
+        if (!isset($this->errorStore)) {
+            return null;
         }
 
-        return $this->wrap($formGroup);
-    }
-
-    protected function wrap($group)
-    {
-        return new GroupWrapper($group);
-    }
-
-    protected function getLabelTitle($label, $name)
-    {
-        if (!is_null($label)) {
-            return $label;
+        if (!$this->hasError($name)) {
+            return '';
         }
 
-        if ($this->translator->has("forms.{$name}")) {
-            return $this->translator->get("forms.{$name}");
+        $message = $this->errorStore->getError($name);
+
+        if ($format) {
+            $message = str_replace(':message', $message, $format);
         }
 
-        return title_case($name);
+        return $message;
+    }
+
+    public function bind($model)
+    {
+        $this->model = is_array($model) ? (object)$model : $model;
+    }
+
+    public function getValueFor($name)
+    {
+        if ($this->hasOldInput()) {
+            return $this->getOldInput($name);
+        }
+
+        if ($this->hasModelValue($name)) {
+            return $this->getModelValue($name);
+        }
+
+        return null;
+    }
+
+    protected function hasOldInput()
+    {
+        if (!isset($this->oldInput)) {
+            return false;
+        }
+
+        return $this->oldInput->hasOldInput();
+    }
+
+    protected function getOldInput($name)
+    {
+        return $this->escape($this->oldInput->getOldInput($name));
+    }
+
+    protected function hasModelValue($name)
+    {
+        if (!isset($this->model)) {
+            return false;
+        }
+
+        return isset($this->model->{$name}) || method_exists($this->model, '__get');
+    }
+
+    protected function getModelValue($name)
+    {
+        return $this->escape($this->model->{$name});
+    }
+
+    protected function escape($value)
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        return htmlentities($value, ENT_QUOTES, 'UTF-8');
+    }
+
+    protected function unbindModel()
+    {
+        $this->model = null;
+    }
+
+    public function selectMonth($name, $format = '%B')
+    {
+        $months = [];
+        foreach (range(1, 12) as $month) {
+            $months[$month] = strftime($format, mktime(0, 0, 0, $month, 1));
+        }
+
+        return $this->select($name, $months);
+    }
+
+    public function selectRange($name, $begin, $end)
+    {
+        $range = array_combine($range = range($begin, $end), $range);
+
+        return $this->select($name, $range);
+    }
+
+    public function selectDate($name, $beginYear = 1900, $endYear = null)
+    {
+        if (!$endYear) {
+            $endYear = date('Y') + 10;
+        }
+
+        $date = (new Field($this->selectRange('_'.$name . '[date]', 1, 31)->addClass('compact')));
+        $month = (new Field($this->selectMonth('_'.$name . '[month]')->addClass('compact')));
+        $year = (new Field($this->selectRange('_'.$name . '[year]', $beginYear, $endYear)->addClass('compact')));
+
+        return new SelectDateWrapper($date, $month, $year);
+    }
+
+    public function selectDateTime($name, $beginYear = 1900, $endYear = null, $interval = 30)
+    {
+        if (!$endYear) {
+            $endYear = date('Y') + 10;
+        }
+
+        $date = (new Field($this->selectRange('_'.$name . '[date]', 1, 31)->addClass('compact')));
+        $month = (new Field($this->selectMonth('_'.$name . '[month]')->addClass('compact')));
+        $year = (new Field($this->selectRange('_'.$name . '[year]', $beginYear, $endYear)->addClass('compact')));
+
+        $timeOptions = $this->getTimeOptions($interval);
+
+        $time = (new Field($this->select('_'.$name . '[time]', $timeOptions)->addClass('compact')));
+
+        return new SelectDateTimeWrapper($date, $month, $year, $time);
+    }
+
+    protected function getTimeOptions($interval)
+    {
+        $times = [];
+        $today = Carbon::create(1970, 01, 01, 0, 0, 0);
+        $tomorrow = clone $today;
+        $tomorrow->addDay(1);
+
+        while($today < $tomorrow) {
+            $key = $val = sprintf('%s:%s', $today->format('H'), $today->format('i'));
+            $times[$key] = $val;
+
+            $today->addMinutes($interval);
+        }
+
+        return $times;
     }
 }

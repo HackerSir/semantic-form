@@ -1,68 +1,126 @@
 <?php
 
-use Illuminate\Support\Facades\Lang;
-use Laravolt\SemanticForm\SemanticForm;
-use AdamWathan\Form\FormBuilder;
+use Laravolt\SemanticForm\Elements\Checkbox;
 
 class CheckboxTest extends PHPUnit_Framework_TestCase
 {
-    private $form;
-    private $builder;
+	public function testCheckboxCanBeCreated()
+	{
+		$checkbox = new Checkbox('terms');
+	}
 
-    public function setUp()
-    {
-        $this->builder = new FormBuilder;
+	public function testRenderBasicCheckbox()
+	{
+		$checkbox = new Checkbox('terms');
+		$expected = '<input type="checkbox" name="terms" value="1">';
+		$result = $checkbox->render();
 
-        $translator = Mockery::mock('Illuminate\Translation\Translator');
-        $translator->shouldReceive('has')->andReturn(false);
+		$this->assertEquals($expected, $result);
 
-        $this->form = new SemanticForm($this->builder, $translator);
-    }
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->render();
 
-    public function tearDown()
-    {
-        Mockery::close();
-    }
+		$this->assertEquals($expected, $result);
+	}
 
-    public function testBasic()
-    {
-        $expected = '<div class="field"><div class="ui checkbox"><input type="checkbox" name="fruit" value="Apple"><label>Apple</label></div></div>';
-        $result = $this->form->checkbox('fruit', 'Apple')->render();
-        $this->assertEquals($expected, $result);
-    }
+	public function testRenderBasicCheckboxWithValue()
+	{
+		$checkbox = new Checkbox('terms');
+		$expected = '<input type="checkbox" name="terms" value="agree">';
+		$result = $checkbox->value('agree')->render();
 
-    public function testWithLabel()
-    {
-        $expected = '<div class="field"><div class="ui checkbox"><input type="checkbox" name="fruit" value="Apple"><label>Custom Label</label></div></div>';
-        $result = $this->form->checkbox('fruit', 'Apple', 'Custom Label')->render();
-        $this->assertEquals($expected, $result);
-    }
+		$this->assertEquals($expected, $result);
 
-    public function testChecked()
-    {
-        $expected = '<div class="field"><div class="ui checkbox"><input type="checkbox" name="fruit" value="Apple" checked="checked"><label>Apple</label></div></div>';
-        $result = $this->form->checkbox('fruit', 'Apple')->check()->render();
-        $this->assertEquals($expected, $result);
-    }
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="true">';
+		$result = $checkbox->value('true')->render();
 
-    public function testCheckedByVariable()
-    {
-        $expected = '<div class="field"><div class="ui checkbox"><input type="checkbox" name="fruit" value="Apple" checked="checked"><label>Apple</label></div></div>';
-        $result = $this->form->checkbox('fruit', 'Apple')->setChecked(true)->render();
-        $this->assertEquals($expected, $result);
-    }
+		$this->assertEquals($expected, $result);
+	}
 
-    public function testUncheckedByVariable()
-    {
-        $expected = '<div class="field"><div class="ui checkbox"><input type="checkbox" name="fruit" value="Apple"><label>Apple</label></div></div>';
-        $result = $this->form->checkbox('fruit', 'Apple')->setChecked(false)->render();
-        $this->assertEquals($expected, $result);
-    }
+	public function testCanCheckCheckbox()
+	{
+		$checkbox = new Checkbox('terms');
+		$expected = '<input type="checkbox" name="terms" value="1" checked="checked">';
+		$result = $checkbox->check()->render();
 
-    public function testChaining()
-    {
-        $expected = '<div class="field"><div class="ui checkbox"><input type="checkbox" name="fruit" value="Apple"><label>Apple</label></div></div>';
-        $result = $this->form->checkbox('fruit', 'Apple')->uncheck()->check()->setChecked(false)->render();
-        $this->assertEquals($expected, $result);
-    }
+		$this->assertEquals($expected, $result);
+	}
+
+	public function testCanUncheckCheckbox()
+	{
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->check()->uncheck()->render();
+
+		$this->assertEquals($expected, $result);
+	}
+
+	public function testDefaultToChecked()
+	{
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1" checked="checked">';
+		$result = $checkbox->defaultToChecked()->render();
+
+		$this->assertEquals($expected, $result);
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->defaultToChecked()->uncheck()->render();
+
+		$this->assertEquals($expected, $result);
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->uncheck()->defaultToChecked()->render();
+
+		$this->assertEquals($expected, $result);
+	}
+
+	public function testDefaultToUnchecked()
+	{
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->defaultToUnchecked()->render();
+
+		$this->assertEquals($expected, $result);
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1" checked="checked">';
+		$result = $checkbox->defaultToUnchecked()->check()->render();
+
+		$this->assertEquals($expected, $result);
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1" checked="checked">';
+		$result = $checkbox->check()->defaultToUnchecked()->render();
+
+		$this->assertEquals($expected, $result);
+	}
+
+	public function testDefaultCheckedState()
+	{
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1" checked="checked">';
+		$result = $checkbox->defaultCheckedState(true)->render();
+
+		$this->assertEquals($expected, $result);
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->defaultCheckedState(false)->render();
+
+		$this->assertEquals($expected, $result);
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1">';
+		$result = $checkbox->uncheck()->defaultCheckedState(true)->render();
+
+		$checkbox = new Checkbox('above_18');
+		$expected = '<input type="checkbox" name="above_18" value="1" checked="checked">';
+		$result = $checkbox->check()->defaultCheckedState(false)->render();
+
+		$this->assertEquals($expected, $result);
+	}
 }

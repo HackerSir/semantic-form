@@ -1,48 +1,30 @@
 <?php
 
-use Illuminate\Support\Facades\Lang;
-use Laravolt\SemanticForm\SemanticForm;
-use AdamWathan\Form\FormBuilder;
+use Laravolt\SemanticForm\Elements\Button;
 
 class ButtonTest extends PHPUnit_Framework_TestCase
 {
-    private $form;
-    private $builder;
-
-    public function setUp()
+    public function testButtonCanBeCreated()
     {
-        $this->builder = new FormBuilder;
-
-        $translator = Mockery::mock('Illuminate\Translation\Translator');
-        $translator->shouldReceive('has')->andReturn(false);
-
-        $this->form = new SemanticForm($this->builder, $translator);
+        $submit = new Button('Click Me', 'click-me');
     }
 
-    public function tearDown()
+    public function testRenderBasicButton()
     {
-        Mockery::close();
-    }
+        $button = new Button('Click Me', 'click-me');
+        $expected = '<button type="button" class="ui button" name="click-me">Click Me</button>';
+        $result = $button->render();
 
-    public function testBasic()
-    {
-        $expected = '<button type="button" class="ui button">Action</button>';
-        $result = $this->form->button('Action')->render();
         $this->assertEquals($expected, $result);
     }
 
-    public function testWithName()
+    public function testCanChangeValue()
     {
-        $expected = '<button type="button" name="register" class="ui button">Action</button>';
-        $result = $this->form->button('Action', 'register')->render();
+        $button = new Button('Button');
+        $button->value('Click Me');
+        $expected = '<button type="button" class="ui button">Click Me</button>';
+        $result = $button->render();
+
         $this->assertEquals($expected, $result);
     }
-
-    public function testWithNameAndClass()
-    {
-        $expected = '<button type="button" name="register" class="ui button primary">Action</button>';
-        $result = $this->form->button('Action', 'register', 'primary')->render();
-        $this->assertEquals($expected, $result);
-    }
-
 }
